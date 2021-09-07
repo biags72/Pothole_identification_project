@@ -1,0 +1,212 @@
+#define _CRT_SECURE_NO_WARNINGS
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+
+void main(void)
+{
+    int i, j; 
+    int m, n, l = 0, o;
+    int temp;
+
+    int clas_NP = 1;
+    int clas_P = 0;
+
+    
+    char unknown[32][150]; //array of data from unknown test
+    
+    int vel = 15; //vel from unknown test
+
+    double Tz = 10.25 * vel + 12916.5;
+    //double Tz = 0;
+    int Tv = 5;
+    double Txz = 0.1;
+    //double Txz = 0;
+
+    int rowt = 3813; //total rows in training data file
+    int row = 32;  //total rows in unknown data file
+
+    int k = 61; // k = sqrt(n) where n is total number of rows in training data file (number of samples)
+
+    
+
+    int clas[32]; //array of predicted class of each point in training data file
+
+    char train[3813][150], buffer[150]; // array of data from training file
+    int sum, distance; 
+    char* token;
+    int dist_Arry[3813][2]; //array of distances from unknown point to all points in training data file
+
+
+    char s[2] = ",";
+    
+
+    int x, z; //acceleration of unknown event in x and z directions
+    int xt, zt, clt; //acceleration of training data points in x and z directions. Also, class of each point. 
+    
+    double ratio;
+
+
+    FILE* trainf; //training data file
+    FILE* unknownf; //unknown data file
+
+    
+    if ((unknownf = fopen("C:\\Users\\amerk\\Desktop\\test_unknown_15_1.txt", "r")) == NULL) {
+        printf("Error! opening file");
+
+        // Program exits if the file pointer returns NULL.
+        exit(1);
+    }
+
+
+    printf("\n");
+    for (j = 0; j < 15; j++)
+    {
+        fgets(buffer, 150, unknownf); //get the next line in file and save to buffer array
+        strcpy(unknown[j], buffer); //copy line from buffer array to unknown data array
+
+
+        token = strtok(unknown[j], s); //find x acceleration of unknown point
+        x = atoi(token); //save x acceleration of unknown point
+        token = strtok(NULL, s); //find z acceleration of unknown point
+        z = atoi(token); //save z acceleration of unknown point
+
+        //printf("Acc of Event: %d,%d\n", x, z);
+
+        if ((trainf = fopen("C:\\Users\\amerk\\Desktop\\test_train_15_1.txt", "r")) == NULL) {
+            printf("Error! opening file");
+
+            // Program exits if the file pointer returns NULL.
+            exit(1);
+        }
+
+        ratio = fabs(x / (double)z);
+        //printf("%f\n", ratio);
+
+        
+
+        for (i = 0; i < rowt; i++)
+        {
+            
+            fgets(buffer, 150, trainf);
+            strcpy(train[i], buffer);
+
+            token = strtok(train[i], s);
+            xt = atoi(token);
+            token = strtok(NULL, s);
+            zt = atoi(token);
+            token = strtok(NULL, s);
+            clt = atoi(token);
+
+            //printf("Training Data: %d,%d,%d\n", xt, zt, clt);
+            
+            sum = ((z - zt) * (z - zt)) + ((vel - 15) * (vel - 15)); 
+            distance = sqrt(sum);
+
+            // Now we run the event through filters to reject false events
+           
+
+           if (z < Tz) {
+                dist_Arry[i][0] = distance;
+                dist_Arry[i][1] = clas_NP;
+                //printf("Low Acceleration\n");
+            }
+            else if (vel < Tv) {
+                dist_Arry[i][0] = distance;
+                dist_Arry[i][1] = clas_NP;
+                //printf("Low Speed\n");
+            }
+            else if (ratio < Txz) {
+                dist_Arry[i][0] = distance;
+                dist_Arry[i][1] = clas_NP;
+                //printf("False Event\n");
+            }
+            else {
+                dist_Arry[i][0] = distance;
+                dist_Arry[i][1] = clt;
+            }
+
+            
+
+            //printf("Distance & class: %d,%d\n", dist_Arry[i][0], dist_Arry[i][1]);
+            
+        }
+
+        fclose(trainf);
+
+        //here we sort the distance array in ascending order
+        
+        for (m = 0 ; m < rowt ; m++)
+        {
+            for (n = m + 1 ; n < rowt ; n++)
+            {
+                if (dist_Arry[m][l] > dist_Arry[n][l])
+                {
+                    for (o = 0 ; o < 2 ; o++) {
+                        temp = dist_Arry[m][o];
+                        dist_Arry[m][o] = dist_Arry[n][o];
+                        dist_Arry[n][o] = temp;
+                    }
+                }
+            }
+        }
+
+        for (m = 0 ; m < rowt ; m++)
+        {
+            //printf("Sorted: %d,%d\n", dist_Arry[m][0], dist_Arry[m][1]);
+            
+        }
+
+        //next, we take majority vote on the first k lines of distance array and print the prediciton
+
+        int count = 0;
+        for (i = 0; i < k; i++)
+        {
+            if (dist_Arry[i][1] == 0) {
+                count++;
+            }
+        }
+
+        //printf("Count: %d\n", count);
+
+        //printf("Probability: %.2f%%\n", ((double) count / k)*100);
+
+        if (((double)count / k) > 0.5) {
+            clas[j] = 0;
+        }
+        else {
+            clas[j] = 1;
+        }
+
+        printf("  Prediction: %d\n", clas[j]);
+
+       
+   }
+    
+    fclose(unknownf);
+
+    int k_2 = 15;
+
+    int count2 = 0;
+    for (i = 0; i < k_2; i++) {
+
+        if (clas[i] == 0) {
+            count2++;
+        }
+    }
+    
+    //printf("\n%d out of %d = %.2f%% \n", count2, k_2, ((double)count2/k_2)*100);
+
+
+    if (((double)count2 / k_2) > 0.5) {
+        
+        
+        printf("\n  Pothole Detected\n");
+    }
+    else {
+        printf("\n  No Pothole Detected\n");
+    }
+
+}
